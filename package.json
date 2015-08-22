@@ -1,0 +1,27 @@
+{
+  "name": "@jonny/spotify-web-helper",
+  "version": "1.0.0",
+  "description": "Control Spotify from node!",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/onetune/spotify-web-helper.git"
+  },
+  "keywords": [
+    "spotify"
+  ],
+  "author": "Jonny <jonathanburger11@gmail.com> (http://jonny.io)",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/onetune/spotify-web-helper/issues"
+  },
+  "homepage": "https://github.com/onetune/spotify-web-helper#readme",
+  "dependencies": {
+    "bluebird": "^2.9.34",
+    "process-exists": "^1.0.0",
+    "request": "^2.61.0"
+  }
+}

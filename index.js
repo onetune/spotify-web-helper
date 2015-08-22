@@ -255,7 +255,7 @@ function SpotifyWebHelper(opts) {
 				startSeekingInterval.call(this)
 			}
 			else {
-				if (Math.abs(this.status.playing_position - status.playing_position) <= 1) {
+				if (Math.abs(status.playing_position - status.track.length) <= 1) {
 					this.player.emit('end')
 				}
 				this.player.emit('pause')

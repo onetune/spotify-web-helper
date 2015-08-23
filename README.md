@@ -18,6 +18,12 @@ helper.player.on('ready', function() {
 
 	helper.player.on('error', function(err) {})
 
+	// These methods return promises
+	helper.player.play('spotify:track:213342152345')
+	helper.player.pause()
+	helper.player.seek()
+
+
 	console.log(helper.status)
 	// 'status': {
 	//  	'track': ...,

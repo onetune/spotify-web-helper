@@ -38,6 +38,16 @@ function getJSON(obj) {
 	})
 }
 
+function parseTime(number) {
+	fullseconds = Math.round(number);
+	minutes = Math.floor(fullseconds / 60);
+	seconds = fullseconds - (minutes * 60);
+	if (seconds < 10) {
+		seconds = '0' + seconds;
+	}
+	return minutes + ':' + seconds;
+}
+
 var ASCII_LOWER_CASE = "abcdefghijklmnopqrstuvwxyz";
 function generateRandomString(length) {
 	var text = "";
@@ -226,6 +236,12 @@ function SpotifyWebHelper(opts) {
 			.catch(function (err) {
 				reject(err)
 			})
+		}).bind(this))
+	}).bind(this)
+	this.player.seekTo = (function (seconds) {
+		return new Promise((function (resolve, reject) {
+			this.status.playing_position = seconds
+			return this.player.play(this.status.track.track_resource.uri + "#" + parseTime(seconds));
 		}).bind(this))
 	}).bind(this)
 	this.status = null;

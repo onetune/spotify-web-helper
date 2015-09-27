@@ -3,7 +3,10 @@ var qs = require('querystring');
 var util = require('util');
 var child_process = require('child_process');
 var process_exists = require('process-exists');
-var Promise = require('bluebird');
+// Try to use native promise if possible
+if (!Promise) {
+	Promise = require('bluebird');
+}
 var EventEmitter = require('events').EventEmitter;
 
 var wintools;

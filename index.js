@@ -303,9 +303,9 @@ function SpotifyWebHelper(opts) {
 				}
 				resolve()
 			}).bind(this))
-			.catch(function (err) {
+			.catch((function (err) {
 				reject(err);
-			}).bind(this)
+			}).bind(this));
 		}).bind(this))
 	}
 	var listenStatus = function() {
@@ -328,8 +328,8 @@ function SpotifyWebHelper(opts) {
 		    	}).bind(this))
 		    	.catch((function (err) {
 		    		this.player.emit(err);
-		    	}).bind(this))
-		    	resolve()
+		    	}).bind(this));
+		    	resolve();
 	    	}).bind(this))
 		}
 		listen.call(this)
@@ -351,9 +351,9 @@ function SpotifyWebHelper(opts) {
 		this.player.emit('ready')
 		return listenStatus.call(this)
 	}).bind(this))
-	.catch(function (err) {
-		helper.player.emit('error', err)
-	})
+	.catch((function (err) {
+		this.player.emit('error', err)
+	}).bind(this))
 
 }
  // Possible error: need to wait until  actually started / spotify not installed

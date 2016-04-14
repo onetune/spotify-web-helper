@@ -22,6 +22,8 @@
   "dependencies": {
     "bluebird": "^2.9.34",
     "process-exists": "^1.0.0",
-    "request": "^2.61.0"
+    "request": "^2.61.0",
+    "user-home": "^2.0.0",
+    "wintools": "^0.1.0"
   }
 }

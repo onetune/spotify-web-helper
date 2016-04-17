@@ -3,6 +3,7 @@ var qs = require('querystring');
 var util = require('util');
 var child_process = require('child_process');
 var process_exists = require('process-exists');
+
 // Try to use native promise if possible
 if (!Promise) {
 	Promise = require('bluebird');
@@ -90,24 +91,28 @@ function isSpotifyWebHelperRunning(cb) {
 			})
 		}
 		// Windows
-		if (process.platform == 'win32') {
+		else if (process.platform == 'win32') {
 			wintools = wintools || require('wintools');
-			wintools.ps(function (err, list) {
+			wintools.ps(function (err, lst) {
 				if (err) {
-					reject(err)
+					return cb(err);
 				}
 				spotifyWebHelperWinProcRegex = spotifyWebHelperWinProcRegex || new RegExp('spotifywebhelper.exe', 'i');
 
-			})
-			for (var k in lst) {
-				if (spotifyWebHelperWinProcRegex.test(lst[k].desc)) {
+				for (var k in lst) {
+					if (spotifyWebHelperWinProcRegex.test(lst[k].desc)) {
+					//return cb(null, true);
 					return resolve(true);
-				}
-				spotifyWebHelperWinProcRegex.lastIndex = 0;
-			};
-			resolve(false);
+					}
+					spotifyWebHelperWinProcRegex.lastIndex = 0;
+				};
+				cb(null, false);
+			});
 		}
-		reject(new Error('Spotify integration only works on Windows or OS X'))
+		else{
+			reject(new Error('Spotify integration only works on Windows or OS X'))
+		}
+		
 	});
 }
 

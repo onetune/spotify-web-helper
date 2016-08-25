@@ -70,7 +70,7 @@ function generateRandomLocalHostName() {
 function getWebHelperPath() {
 	// possible error: on linux
 	if (process.platform == 'win32')  {
-		return require('user-home') + "AppData\\Roaming\\Spotify\\Data\\SpotifyWebHelper.exe"
+		return require('user-home') + "\\AppData\\Roaming\\Spotify\\SpotifyWebHelper.exe"
 	}
 	else {
 		return require('user-home') + "/Library/Application Support/Spotify/SpotifyWebHelper"

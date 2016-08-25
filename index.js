@@ -77,9 +77,7 @@ function getWebHelperPath() {
 	}
 }
 
-function isSpotifyWebHelperRunning(cb) {
-	cb = cb || function () { };
-
+function isSpotifyWebHelperRunning() {
 	return new Promise(function (resolve, reject) {
 		// OSX
 		if (process.platform == 'darwin')  {
@@ -95,18 +93,17 @@ function isSpotifyWebHelperRunning(cb) {
 			wintools = wintools || require('wintools');
 			wintools.ps(function (err, lst) {
 				if (err) {
-					return cb(err);
+					return reject(err);
 				}
 				spotifyWebHelperWinProcRegex = spotifyWebHelperWinProcRegex || new RegExp('spotifywebhelper.exe', 'i');
 
 				for (var k in lst) {
 					if (spotifyWebHelperWinProcRegex.test(lst[k].desc)) {
-					//return cb(null, true);
 					return resolve(true);
 					}
 					spotifyWebHelperWinProcRegex.lastIndex = 0;
 				};
-				cb(null, false);
+				return resolve(false);
 			});
 		}
 		else{

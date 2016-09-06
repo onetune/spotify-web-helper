@@ -10,7 +10,6 @@ if (!Promise) {
 }
 var EventEmitter = require('events').EventEmitter;
 
-var wintools;
 var spotifyWebHelperWinProcRegex;
 
 var DEFAULT_PORT = 4370;
@@ -90,8 +89,8 @@ function isSpotifyWebHelperRunning() {
 		}
 		// Windows
 		else if (process.platform == 'win32') {
-			wintools = wintools || require('wintools');
-			wintools.ps(function (err, lst) {
+			var ps = require('./lib/wintools-ps');
+			ps(function (err, lst) {
 				if (err) {
 					return reject(err);
 				}
@@ -109,7 +108,7 @@ function isSpotifyWebHelperRunning() {
 		else{
 			reject(new Error('Spotify integration only works on Windows or OS X'))
 		}
-		
+
 	});
 }
 

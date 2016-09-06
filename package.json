@@ -1,6 +1,6 @@
 {
   "name": "@jonny/spotify-web-helper",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Control Spotify from node!",
   "main": "index.js",
   "scripts": {
@@ -23,7 +23,6 @@
     "bluebird": "^2.9.34",
     "process-exists": "^1.0.0",
     "request": "^2.61.0",
-    "user-home": "^2.0.0",
-    "wintools": "^0.1.0"
+    "user-home": "^2.0.0"
   }
 }

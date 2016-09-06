@@ -99,7 +99,7 @@ function isSpotifyWebHelperRunning() {
 
 				for (var k in lst) {
 					if (spotifyWebHelperWinProcRegex.test(lst[k].desc)) {
-					return resolve(true);
+						return resolve(true);
 					}
 					spotifyWebHelperWinProcRegex.lastIndex = 0;
 				};

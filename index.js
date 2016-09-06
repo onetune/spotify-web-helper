@@ -329,7 +329,7 @@ function SpotifyWebHelper(opts) {
 		    		this.status = res;
 		    	}).bind(this))
 		    	.catch((function (err) {
-		    		this.player.emit(err);
+		    		this.player.emit('error', err);
 		    	}).bind(this));
 		    	resolve();
 	    	}).bind(this))

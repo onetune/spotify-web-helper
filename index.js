@@ -106,7 +106,8 @@ function isSpotifyWebHelperRunning() {
 			});
 		}
 		else{
-			reject(new Error('Spotify integration only works on Windows or OS X'))
+			// SpotifyWebHelper starts with Spotify by default in Linux
+			return resolve(true);
 		}
 
 	});

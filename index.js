@@ -141,7 +141,7 @@ function SpotifyWebHelper(opts) {
     var localPort = opts.port || DEFAULT_PORT;
 
     this.getCsrfToken = function(cb) {
-    	return new Promise((function (resolve, reject) {
+    	return new Promise((resolve, reject) => {
 	    	return getJSON({
 	    		url: this.generateSpotifyUrl("/simplecsrf/token.json"),
 	    		headers: ORIGIN_HEADER,
@@ -154,10 +154,8 @@ function SpotifyWebHelper(opts) {
 		    		resolve(res.token)
 	    		}
 	    	})
-	    	.catch(function (err) {
-	    		reject(err);
-	    	})
-    	}).bind(this))
+	    	.catch(reject)
+    	});
     }
     this.ensureSpotifyWebHelper = function() {
     	return new Promise(function (resolve, reject) {
@@ -197,58 +195,40 @@ function SpotifyWebHelper(opts) {
 	}
 	this.player = new EventEmitter();
 	this.player.pause = (function (unpause) {
-		return new Promise((function (resolve, reject) {
-			return getJSON({
-				url: this.generateSpotifyUrl("/remote/pause.json"),
-				headers: ORIGIN_HEADER,
-				params: {
-					returnafter: 1,
-					returnon: RETURN_ON.join(','),
-					oauth: this.oauthtoken,
-					csrf: this.csrftoken,
-					pause: !!!unpause
-				}
-			})
-			.then(function () {
-				resolve()
-			})
-			.catch(function () {
-				reject(err)
-			})
-		}).bind(this))
+		return getJSON({
+			url: this.generateSpotifyUrl("/remote/pause.json"),
+			headers: ORIGIN_HEADER,
+			params: {
+				returnafter: 1,
+				returnon: RETURN_ON.join(','),
+				oauth: this.oauthtoken,
+				csrf: this.csrftoken,
+				pause: !Boolean(unpause)
+			}
+		})
 	}).bind(this)
-	this.player.play = (function (spotifyUri) {
+	this.player.play = spotifyUri => {
 		if (!spotifyUri || (this.status && this.status.track && this.status.track.track_resource && this.status.track.track_resource.uri == spotifyUri)) {
 			this.player.pause(true)
 			return
 		}
-		return new Promise((function (resolve, reject) {
-			return getJSON({
-				url: this.generateSpotifyUrl("/remote/play.json"),
-				headers: ORIGIN_HEADER,
-				params: {
-					returnafter: 1,
-					returnon: RETURN_ON.join(','),
-					oauth: this.oauthtoken,
-					csrf: this.csrftoken,
-					uri: spotifyUri,
-					context: spotifyUri
-				}
-			})
-			.then(function (res) {
-				resolve()
-			})
-			.catch(function (err) {
-				reject(err)
-			})
-		}).bind(this))
-	}).bind(this)
-	this.player.seekTo = (function (seconds) {
-		return new Promise((function (resolve, reject) {
-			this.status.playing_position = seconds
-			return this.player.play(this.status.track.track_resource.uri + "#" + parseTime(seconds));
-		}).bind(this))
-	}).bind(this)
+		return getJSON({
+			url: this.generateSpotifyUrl("/remote/play.json"),
+			headers: ORIGIN_HEADER,
+			params: {
+				returnafter: 1,
+				returnon: RETURN_ON.join(','),
+				oauth: this.oauthtoken,
+				csrf: this.csrftoken,
+				uri: spotifyUri,
+				context: spotifyUri
+			}
+		})
+	}
+	this.player.seekTo = seconds => {
+		this.status.playing_position = seconds
+		return this.player.play(this.status.track.track_resource.uri + "#" + parseTime(seconds));
+	}
 	this.status = null;
 	var seekingInterval = null;
 	var startSeekingInterval = function() {
@@ -285,8 +265,8 @@ function SpotifyWebHelper(opts) {
 		}
 	}
 	var getStatus = function() {
-		return new Promise((function (resolve, reject) {
-			return getJSON({
+		return new Promise((resolve, reject) => {
+			getJSON({
 				url: this.generateSpotifyUrl("/remote/status.json"),
 				headers: ORIGIN_HEADER,
 				params: {
@@ -296,7 +276,7 @@ function SpotifyWebHelper(opts) {
 					csrf: this.csrftoken
 				}
 			})
-			.then((function (res) {
+			.then(res => {
 				this.status = res;
 				if (res.playing) {
 					this.player.emit('play')
@@ -304,15 +284,13 @@ function SpotifyWebHelper(opts) {
 					this.player.emit('track-change', res.track)
 				}
 				resolve()
-			}).bind(this))
-			.catch((function (err) {
-				reject(err);
-			}).bind(this));
-		}).bind(this))
+			})
+			.catch(reject);
+		});
 	}
 	var listenStatus = function() {
-		var listen = function() {
-	    	return new Promise((function (resolve, reject) {
+		var listen = () => {
+	    	return new Promise((resolve, reject) => {
 		    	return getJSON({
 		    		url: this.generateSpotifyUrl("/remote/status.json"),
 		    		headers: KEEPALIVE_HEADER,
@@ -332,9 +310,9 @@ function SpotifyWebHelper(opts) {
 		    		this.player.emit('error', err);
 		    	}).bind(this));
 		    	resolve();
-	    	}).bind(this))
+	    	});
 		}
-		listen.call(this)
+		listen();
 	}
 
 	this.ensureSpotifyWebHelper()

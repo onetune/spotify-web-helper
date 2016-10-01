@@ -12,8 +12,8 @@ helper.player.on('ready', () => {
 	helper.player.on('end', function () {
 		console.log('ended');
 	});
-	helper.player.on('track-change', function (track) {
-		console.log('track changed', track);
+	helper.player.on('track-will-change', function (track) {
+		console.log('new track', track);
 	});
 	console.log(helper.status);
 	// 'status': {

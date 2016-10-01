@@ -4,6 +4,7 @@ var qs = require('querystring');
 var util = require('util');
 var request = require('request');
 var processExists = require('process-exists');
+var chalk = require('chalk');
 
 var spotifyWebHelperWinProcRegex;
 
@@ -222,7 +223,11 @@ function SpotifyWebHelper(opts) {
 	this.compareStatus = function (status) {
 		let hasUri = track => track && track.track_resource && track.track_resource.uri;
 		if (hasUri(this.status.track) && hasUri(status.track) && this.status.track.track_resource.uri !== status.track.track_resource.uri) {
-			this.player.emit('track-change', status.track);
+			this.player.emit('track-will-change', status.track);
+			let hadListeners = this.player.emit('track-change', status.track);
+			if (hadListeners) {
+				console.log(chalk.yellow(`WARN: 'track-change' was renamed to 'track-will-change'. Please update your listener.`))
+			}
 		}
 		if (this.status.playing !== status.playing) {
 			if (status.playing) {

@@ -229,7 +229,7 @@ function SpotifyWebHelper(opts) {
 				this.player.emit('play');
 				startSeekingInterval.call(this);
 			} else {
-				if (Math.abs(status.playing_position - status.track.length) <= 1) { 
+				if (Math.abs(status.playing_position - status.track.length) <= 1) {
 					this.player.emit('end');
 				}
 				this.player.emit('pause');

@@ -2,7 +2,7 @@ var SpotifyWebHelper = require('./index');
 
 var helper = new SpotifyWebHelper();
 
-helper.player.on('ready', function () {
+helper.player.on('ready', () => {
 	helper.player.on('play', function () {
 		console.log('play');
 	});
@@ -15,9 +15,6 @@ helper.player.on('ready', function () {
 	helper.player.on('track-change', function (track) {
 		console.log('track changed', track);
 	});
-	helper.player.on('error', function (error) {
-		console.error(error);
-	});
 	console.log(helper.status);
 	// 'status': {
 	//  	'track': ...,
@@ -25,3 +22,5 @@ helper.player.on('ready', function () {
 	//		'playing_position': ...
 	//  }
 });
+
+helper.player.on('error', error => console.error(error));

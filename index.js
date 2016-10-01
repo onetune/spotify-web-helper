@@ -1,8 +1,8 @@
 var EventEmitter = require('events').EventEmitter;
-var request = require('request');
+var childProcess = require('child_process');
 var qs = require('querystring');
 var util = require('util');
-var childProcess = require('child_process');
+var request = require('request');
 var processExists = require('process-exists');
 
 var spotifyWebHelperWinProcRegex;
@@ -11,34 +11,35 @@ var DEFAULT_PORT = 4370;
 var RETURN_ON = ['login', 'logout', 'play', 'pause', 'error', 'ap'];
 var DEFAULT_RETURN_AFTER = 60;
 
-var ORIGIN_HEADER = {'Origin': 'https://open.spotify.com'};
-var KEEPALIVE_HEADER = {'Connection': 'keep-alive', 'Origin': 'https://open.spotify.com'};
+var ORIGIN_HEADER = {Origin: 'https://open.spotify.com'};
+var KEEPALIVE_HEADER = {Connection: 'keep-alive', Origin: 'https://open.spotify.com'};
 
 function getJSON(obj) {
 	return new Promise(function (resolve, reject) {
-		if (obj.params)
+		if (obj.params) {
 			obj.url += '?' + qs.stringify(obj.params);
+		}
 		request({
-			'url': obj.url,
-			'headers': obj.headers,
-			'rejectUnauthorized': false
+			url: obj.url,
+			headers: obj.headers,
+			rejectUnauthorized: false
 		}, function (err, req, body) {
-			if (err) { return reject(err); }
-			var parsedBody;
+			if (err) {
+				return reject(err);
+			}
 			try {
 				resolve(JSON.parse(body));
-			}
-			catch (e) {
-				reject(e);
+			} catch (err) {
+				reject(err);
 			}
 		});
 	});
 }
 
 function parseTime(number) {
-	fullseconds = Math.round(number);
-	minutes = Math.floor(fullseconds / 60);
-	seconds = fullseconds - (minutes * 60);
+	let fullseconds = Math.round(number);
+	let minutes = Math.floor(fullseconds / 60);
+	let seconds = fullseconds - (minutes * 60);
 	if (seconds < 10) {
 		seconds = '0' + seconds;
 	}
@@ -49,8 +50,9 @@ var ASCII_LOWER_CASE = 'abcdefghijklmnopqrstuvwxyz';
 function generateRandomString(length) {
 	var text = '';
 
-	for (var i = 0; i < length; i++)
+	for (var i = 0; i < length; i++) {
 		text += ASCII_LOWER_CASE.charAt(Math.floor(Math.random() * ASCII_LOWER_CASE.length));
+	}
 
 	return text;
 }
@@ -61,29 +63,25 @@ function generateRandomLocalHostName() {
 }
 
 function getWebHelperPath() {
-	// possible error: on linux
-	if (process.platform == 'win32') {
+	if (process.platform === 'win32') {
 		return require('user-home') + '\\AppData\\Roaming\\Spotify\\SpotifyWebHelper.exe';
 	}
-	else {
-		return require('user-home') + '/Library/Application Support/Spotify/SpotifyWebHelper';
-	}
+	return require('user-home') + '/Library/Application Support/Spotify/SpotifyWebHelper';
 }
 
 function isSpotifyWebHelperRunning() {
 	return new Promise(function (resolve, reject) {
-		// OSX
-		if (process.platform == 'darwin') {
+		if (process.platform === 'darwin') {
 			return processExists('SpotifyWebHelper', function (err, exists) {
-				if (err) { reject(err); }
-				else {
+				if (err) {
+					reject(err);
+				} else {
 					resolve(exists);
 				}
 			});
-		}
-		// Windows
-		else if (process.platform == 'win32') {
+		} else if (process.platform === 'win32') {
 			var ps = require('./lib/wintools-ps');
+
 			ps(function (err, lst) {
 				if (err) {
 					return reject(err);
@@ -98,8 +96,7 @@ function isSpotifyWebHelperRunning() {
 				}
 				return resolve(false);
 			});
-		}
-		else {
+		} else {
 			// SpotifyWebHelper starts with Spotify by default in Linux
 			return resolve(true);
 		}
@@ -110,15 +107,14 @@ function startSpotifyWebHelper() {
 	return new Promise(function (resolve, reject) {
 		var child = childProcess.spawn(getWebHelperPath(), {detached: true});
 		child.on('error', function (err) {
-			reject(new Error('Spotify is not installed.'));
+			reject(new Error('Spotify is not installed. ' + err.message));
 		});
 		child.unref();
 		isSpotifyWebHelperRunning()
 		.then(function (isRunning) {
 			if (isRunning) {
 				resolve(true);
-			}
-			else {
+			} else {
 				reject(new Error('Cannot start Spotify.'));
 			}
 		});
@@ -133,7 +129,7 @@ function SpotifyWebHelper(opts) {
 	opts = opts || {};
 	var localPort = opts.port || DEFAULT_PORT;
 
-	this.getCsrfToken = function (cb) {
+	this.getCsrfToken = () => {
 		return new Promise((resolve, reject) => {
 			return getJSON({
 				url: this.generateSpotifyUrl('/simplecsrf/token.json'),
@@ -142,8 +138,7 @@ function SpotifyWebHelper(opts) {
 			.then(function (res) {
 				if (res.error) {
 					throw new Error(res.error.message);
-				}
-				else {
+				} else {
 					resolve(res.token);
 				}
 			})
@@ -153,17 +148,11 @@ function SpotifyWebHelper(opts) {
 	this.ensureSpotifyWebHelper = function () {
 		return new Promise(function (resolve, reject) {
 			isSpotifyWebHelperRunning()
-			.then(function (isRunning) {
+			.then(isRunning => {
 				if (isRunning) {
-					return resolve(true);
+					return resolve();
 				}
-				else {
-					return startSpotifyWebHelper();
-				}
-			})
-			.then(function () {
-				resolve(true);
-				// Fire 'start' event
+				return startSpotifyWebHelper();
 			})
 			.catch(function (err) {
 				reject(err);
@@ -181,13 +170,11 @@ function SpotifyWebHelper(opts) {
 			.then(function (res) {
 				resolve(res.t);
 			})
-			.catch(function (err) {
-				reject(err);
-			});
+			.catch(reject);
 		});
 	};
 	this.player = new EventEmitter();
-	this.player.pause = (function (unpause) {
+	this.player.pause = unpause => {
 		return getJSON({
 			url: this.generateSpotifyUrl('/remote/pause.json'),
 			headers: ORIGIN_HEADER,
@@ -196,12 +183,12 @@ function SpotifyWebHelper(opts) {
 				returnon: RETURN_ON.join(','),
 				oauth: this.oauthtoken,
 				csrf: this.csrftoken,
-				pause: !Boolean(unpause)
+				pause: !unpause
 			}
 		});
-	}).bind(this);
+	};
 	this.player.play = spotifyUri => {
-		if (!spotifyUri || (this.status && this.status.track && this.status.track.track_resource && this.status.track.track_resource.uri == spotifyUri)) {
+		if (!spotifyUri || (this.status && this.status.track && this.status.track.track_resource && this.status.track.track_resource.uri === spotifyUri)) {
 			this.player.pause(true);
 			return;
 		}
@@ -219,37 +206,30 @@ function SpotifyWebHelper(opts) {
 		});
 	};
 	this.player.seekTo = seconds => {
-		this.status.playing_position = seconds;
+		this.status.playing_position = seconds; // eslint-disable-line camelcase
 		return this.player.play(this.status.track.track_resource.uri + '#' + parseTime(seconds));
 	};
 	this.status = null;
 	var seekingInterval = null;
 	var startSeekingInterval = function () {
-		seekingInterval = setInterval((function () {
-			this.status.playing_position += 0.25;
-		}).bind(this), 250);
+		seekingInterval = setInterval(() => {
+			this.status.playing_position += 0.25; // eslint-disable-line camelcase
+		}, 250);
 	};
 	var stopSeekingInterval = function () {
 		clearInterval(seekingInterval);
 	};
 	this.compareStatus = function (status) {
-		if (this.status.track
-			&& this.status.track.track_resource
-			&& this.status.track.track_resource.uri
-			&& status.track
-			&& status.track.track_resource
-			&& status.track.track_resource.uri
-			&& this.status.track.track_resource.uri
-			!= status.track.track_resource.uri) {
+		let hasUri = track => track && track.track_resource && track.track_resource.uri;
+		if (hasUri(this.status.track) && hasUri(status.track) && this.status.track.track_resource.uri !== status.track.track_resource.uri) {
 			this.player.emit('track-change', status.track);
 		}
-		if (this.status.playing != status.playing) {
+		if (this.status.playing !== status.playing) {
 			if (status.playing) {
 				this.player.emit('play');
 				startSeekingInterval.call(this);
-			}
-			else {
-				if (Math.abs(status.playing_position - status.track.length) <= 1) {
+			} else {
+				if (Math.abs(status.playing_position - status.track.length) <= 1) { 
 					this.player.emit('end');
 				}
 				this.player.emit('pause');
@@ -257,7 +237,7 @@ function SpotifyWebHelper(opts) {
 			}
 		}
 	};
-	var getStatus = function () {
+	var getStatus = () => {
 		return new Promise((resolve, reject) => {
 			getJSON({
 				url: this.generateSpotifyUrl('/remote/status.json'),
@@ -281,52 +261,40 @@ function SpotifyWebHelper(opts) {
 			.catch(reject);
 		});
 	};
-	var listenStatus = function () {
-		var listen = () => {
-			return new Promise((resolve, reject) => {
-				return getJSON({
-					url: this.generateSpotifyUrl('/remote/status.json'),
-					headers: KEEPALIVE_HEADER,
-					params: {
-						returnafter: DEFAULT_RETURN_AFTER,
-						returnon: RETURN_ON.join(','),
-						oauth: this.oauthtoken,
-						csrf: this.csrftoken
-					}
-				})
-				.then((function (res) {
-					listen.call(this);
-					this.compareStatus(res);
-					this.status = res;
-				}).bind(this))
-				.catch((function (err) {
-					this.player.emit('error', err);
-				}).bind(this));
-				resolve();
-			});
-		};
-		listen();
+	var listen = () => {
+		getJSON({
+			url: this.generateSpotifyUrl('/remote/status.json'),
+			headers: KEEPALIVE_HEADER,
+			params: {
+				returnafter: DEFAULT_RETURN_AFTER,
+				returnon: RETURN_ON.join(','),
+				oauth: this.oauthtoken,
+				csrf: this.csrftoken
+			}
+		})
+		.then(res => {
+			listen();
+			this.compareStatus(res);
+			this.status = res;
+		})
+		.catch(err => this.player.emit('error', err));
 	};
 
 	this.ensureSpotifyWebHelper()
-	.then((function () {
-		return this.getOauthToken();
-	}).bind(this))
-	.then((function (oauthtoken) {
+	.then(() => this.getOauthToken())
+	.then(oauthtoken => {
 		this.oauthtoken = oauthtoken;
 		return this.getCsrfToken();
-	}).bind(this))
-	.then((function (csrftoken) {
+	})
+	.then(csrftoken => {
 		this.csrftoken = csrftoken;
-		return getStatus.call(this);
-	}).bind(this))
-	.then((function () {
+		return getStatus();
+	})
+	.then(() => {
 		this.player.emit('ready');
-		return listenStatus.call(this);
-	}).bind(this))
-	.catch((function (err) {
-		this.player.emit('error', err);
-	}).bind(this));
+		return listen();
+	})
+	.catch(err => this.player.emit('error', err));
 }
- // Possible error: need to wait until  actually started / spotify not installed
+ // Possible error: need to wait until actually started / spotify not installed
 module.exports = SpotifyWebHelper;

@@ -257,11 +257,12 @@ function SpotifyWebHelper(opts) {
 			})
 			.then(res => {
 				this.status = res;
+				this.player.emit('ready');
 				this.player.emit('status-will-change', res);
 				if (res.playing) {
 					this.player.emit('play');
 					startSeekingInterval.call(this);
-					this.player.emit('track-change', res.track);
+					this.player.emit('track-will-change', res.track);
 				}
 				resolve();
 			})
@@ -298,7 +299,6 @@ function SpotifyWebHelper(opts) {
 		return getStatus();
 	})
 	.then(() => {
-		this.player.emit('ready');
 		return listen();
 	})
 	.catch(err => this.player.emit('error', err));

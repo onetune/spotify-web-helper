@@ -221,6 +221,7 @@ function SpotifyWebHelper(opts) {
 		clearInterval(seekingInterval);
 	};
 	this.compareStatus = function (status) {
+		this.player.emit('status-will-change', status);
 		let hasUri = track => track && track.track_resource && track.track_resource.uri;
 		if (hasUri(this.status.track) && hasUri(status.track) && this.status.track.track_resource.uri !== status.track.track_resource.uri) {
 			this.player.emit('track-will-change', status.track);
@@ -256,6 +257,7 @@ function SpotifyWebHelper(opts) {
 			})
 			.then(res => {
 				this.status = res;
+				this.player.emit('status-will-change', res);
 				if (res.playing) {
 					this.player.emit('play');
 					startSeekingInterval.call(this);

@@ -15,6 +15,9 @@ helper.player.on('ready', () => {
 	helper.player.on('track-will-change', function (track) {
 		console.log('new track', track);
 	});
+	helper.player.on('status-will-change', function (status) {
+		console.log('updated status', status);
+	});
 	console.log(helper.status);
 	// 'status': {
 	//  	'track': ...,

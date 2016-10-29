@@ -21,6 +21,7 @@ helper.player.on('ready', () => {
 	helper.player.on('pause', () => { });
 	helper.player.on('end', () => { });
 	helper.player.on('track-will-change', track => {});
+	helper.player.on('status-will-change', status => {});
 
 	// Playback control. These methods return promises
 	helper.player.play('spotify:track:213342152345');

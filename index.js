@@ -263,7 +263,7 @@ function SpotifyWebHelper(opts) {
 					this.player.emit('play');
 					startSeekingInterval.call(this);
 					this.player.emit('track-will-change', res.track);
-					let hadListeners = this.player.emit('track-change', status.track);
+					let hadListeners = this.player.emit('track-change', this.status.track);
 					if (hadListeners) {
 						console.log(chalk.yellow(`WARN: 'track-change' was renamed to 'track-will-change'. Please update your listener.`))
 					}

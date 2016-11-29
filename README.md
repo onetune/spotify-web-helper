@@ -41,7 +41,3 @@ helper.player.on('ready', () => {
 
 ## Compatibility
 Since 1.3.0 node >=4.0 is required. Use 1.2.0 for older node versions.
-
-## Todo
-
-- [ ] Sometimes Spotify doesn't use the default port. [Want to help implement a mechanism for detecting the correct port?](https://github.com/onetune/spotify-web-helper/issues/6) 

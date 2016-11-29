@@ -8,7 +8,10 @@ var chalk = require('chalk');
 
 var spotifyWebHelperWinProcRegex;
 
-var DEFAULT_PORT = 4370;
+var START_HTTPS_PORT = 4370;
+var END_HTTPS_PORT = 4379;
+var START_HTTP_PORT = 4380;
+var END_HTTP_PORT = 4389;
 var RETURN_ON = ['login', 'logout', 'play', 'pause', 'error', 'ap'];
 var DEFAULT_RETURN_AFTER = 60;
 
@@ -128,7 +131,7 @@ function SpotifyWebHelper(opts) {
 	}
 
 	opts = opts || {};
-	var localPort = opts.port || DEFAULT_PORT;
+	var localPort = opts.port || START_HTTPS_PORT;
 
 	this.getCsrfToken = () => {
 		return new Promise((resolve, reject) => {
@@ -161,7 +164,11 @@ function SpotifyWebHelper(opts) {
 		});
 	};
 	this.generateSpotifyUrl = function (url) {
-		return util.format('https://%s:%d%s', generateRandomLocalHostName(), localPort, url);
+		var protocol = 'https://';
+		if (localPort >= START_HTTP_PORT && localPort <= END_HTTP_PORT) {
+			protocol = 'http://';
+		}
+		return util.format('%s%s:%d%s', protocol, generateRandomLocalHostName(), localPort, url);
 	};
 	this.getOauthToken = function () {
 		return new Promise(function (resolve, reject) {
@@ -174,6 +181,28 @@ function SpotifyWebHelper(opts) {
 			.catch(reject);
 		});
 	};
+
+	this.detectPort = function () {
+		return getJSON({
+			url: this.generateSpotifyUrl('/service/version.json'),
+			headers: ORIGIN_HEADER,
+			params: {
+				'service': 'remote'
+			}
+		})
+		.then(() => localPort)
+		.catch((err) => {
+			if (localPort === END_HTTP_PORT) {
+				throw err;
+			} else if (localPort === END_HTTPS_PORT) {
+				localPort = START_HTTP_PORT;
+			} else {
+				++localPort;
+			}
+			return this.detectPort();
+		});
+	};
+
 	this.player = new EventEmitter();
 	this.player.pause = unpause => {
 		return getJSON({
@@ -293,6 +322,7 @@ function SpotifyWebHelper(opts) {
 	};
 
 	this.ensureSpotifyWebHelper()
+	.then(() => this.detectPort())
 	.then(() => this.getOauthToken())
 	.then(oauthtoken => {
 		this.oauthtoken = oauthtoken;

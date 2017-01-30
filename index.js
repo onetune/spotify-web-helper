@@ -181,7 +181,17 @@ function SpotifyWebHelper(opts) {
 			.catch(reject);
 		});
 	};
-
+  this.checkForError = status => {
+    if (!status.open_graph_state) {
+      this.player.emit('error', new Error('No user logged in'));
+      return true;
+    }
+    if (status.error) {
+      this.player.emit('error', new Error(status.error.message));
+      return true;
+    }
+    return false;
+  };
 	this.detectPort = function () {
 		return getJSON({
 			url: this.generateSpotifyUrl('/service/version.json'),
@@ -250,6 +260,10 @@ function SpotifyWebHelper(opts) {
 		clearInterval(seekingInterval);
 	};
 	this.compareStatus = function (status) {
+    let hasError = this.checkForError(status);
+    if (hasError) {
+      return;
+    }
 		this.player.emit('status-will-change', status);
 		let hasUri = track => track && track.track_resource && track.track_resource.uri;
 		if (hasUri(this.status.track) && hasUri(status.track) && this.status.track.track_resource.uri !== status.track.track_resource.uri) {

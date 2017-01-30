@@ -26,4 +26,10 @@ helper.player.on('ready', () => {
 	//  }
 });
 
-helper.player.on('error', error => console.error(error));
+helper.player.on('error', error => {
+  if (error.message.match(/No user logged in/)) {
+    // also fires when Spotify client quits
+  } else {
+    // other errors: /Cannot start Spotify/ and /Spotify is not installed/
+  }
+});

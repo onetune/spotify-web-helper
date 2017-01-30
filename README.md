@@ -13,7 +13,13 @@ const SpotifyWebHelper = require('@jonny/spotify-web-helper');
 
 const helper = SpotifyWebHelper();
 
-helper.player.on('error', err => { });
+helper.player.on('error', err => {
+  if (error.message.match(/No user logged in/)) {
+    // also fires when Spotify client quits
+  } else {
+    // other errors: /Cannot start Spotify/ and /Spotify is not installed/
+  }
+});
 helper.player.on('ready', () => {
 
   // Playback events
@@ -64,7 +70,8 @@ Playback has ended.
 
 #### Event: 'error'
 An error has occurred. The listener callback receive the `<Error>` as first
-argument.
+argument. An error occurs when Spotify cannot be started, is not installed, or quits.
+Refer to the example above to see how to distinguish errors.
 
 #### Event: 'pause'
 Playback has paused.

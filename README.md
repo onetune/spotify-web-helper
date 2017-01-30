@@ -5,12 +5,12 @@ I am also trying to maintain the project and handle issues, at least every 2 mon
 
 ## Install
 ```
-$ npm install @jonny/spotify-web-helper --save
+$ npm install spotify-web-helper --save
 ```
 
 ## Example
 ````js
-const SpotifyWebHelper = require('@jonny/spotify-web-helper');
+const SpotifyWebHelper = require('spotify-web-helper');
 
 const helper = SpotifyWebHelper();
 

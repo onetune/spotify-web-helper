@@ -1,5 +1,5 @@
 {
-  "name": "@jonny/spotify-web-helper",
+  "name": "spotify-web-helper",
   "version": "1.7.0",
   "description": "Control Spotify from node!",
   "main": "index.js",

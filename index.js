@@ -14,6 +14,7 @@ var START_HTTP_PORT = 4380;
 var END_HTTP_PORT = 4389;
 var RETURN_ON = ['login', 'logout', 'play', 'pause', 'error', 'ap'];
 var DEFAULT_RETURN_AFTER = 60;
+var FAKE_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36';
 
 var ORIGIN_HEADER = {Origin: 'https://open.spotify.com'};
 var KEEPALIVE_HEADER = {Connection: 'keep-alive', Origin: 'https://open.spotify.com'};
@@ -22,6 +23,11 @@ function getJSON(obj) {
 	return new Promise(function (resolve, reject) {
 		if (obj.params) {
 			obj.url += '?' + qs.stringify(obj.params);
+		}
+		if(obj.headers){
+			obj.headers['User-Agent'] = FAKE_USER_AGENT;
+		}else{
+			obj.headers = {'User-Agent': FAKE_USER_AGENT};
 		}
 		request({
 			url: obj.url,

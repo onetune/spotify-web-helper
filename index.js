@@ -24,9 +24,9 @@ function getJSON(obj) {
 		if (obj.params) {
 			obj.url += '?' + qs.stringify(obj.params);
 		}
-		if(obj.headers){
+		if (obj.headers) {
 			obj.headers['User-Agent'] = FAKE_USER_AGENT;
-		}else{
+		} else {
 			obj.headers = {'User-Agent': FAKE_USER_AGENT};
 		}
 		request({

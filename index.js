@@ -56,22 +56,6 @@ function parseTime(number) {
 	return minutes + ':' + seconds;
 }
 
-var ASCII_LOWER_CASE = 'abcdefghijklmnopqrstuvwxyz';
-function generateRandomString(length) {
-	var text = '';
-
-	for (var i = 0; i < length; i++) {
-		text += ASCII_LOWER_CASE.charAt(Math.floor(Math.random() * ASCII_LOWER_CASE.length));
-	}
-
-	return text;
-}
-
-function generateRandomLocalHostName() {
-	// Generate a random hostname under the .spotilocal.com domain
-	return generateRandomString(10) + '.spotilocal.com';
-}
-
 function getWebHelperPath() {
 	if (process.platform === 'win32') {
 		return require('user-home') + '\\AppData\\Roaming\\Spotify\\SpotifyWebHelper.exe';
@@ -174,7 +158,7 @@ function SpotifyWebHelper(opts) {
 		if (localPort >= START_HTTP_PORT && localPort <= END_HTTP_PORT) {
 			protocol = 'http://';
 		}
-		return util.format('%s%s:%d%s', protocol, generateRandomLocalHostName(), localPort, url);
+		return util.format('%s%s:%d%s', protocol, '127.0.0.1', localPort, url);
 	};
 	this.getOauthToken = function () {
 		return new Promise(function (resolve, reject) {

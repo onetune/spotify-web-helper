@@ -30,7 +30,8 @@ function getJSON(obj) {
 			obj.headers = {'User-Agent': FAKE_USER_AGENT};
 		}
 		got(obj.url, {
-			headers: obj.headers
+			headers: obj.headers,
+			rejectUnauthorized: false
 		}).then(response => {
 			try {
 				resolve(JSON.parse(response.body));

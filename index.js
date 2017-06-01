@@ -29,20 +29,15 @@ function getJSON(obj) {
 		} else {
 			obj.headers = {'User-Agent': FAKE_USER_AGENT};
 		}
-		request({
-			url: obj.url,
-			headers: obj.headers,
-			rejectUnauthorized: false
-		}, function (err, req, body) {
-			if (err) {
-				return reject(err);
-			}
+		got(obj.url, {
+			headers: obj.headers
+		}).then(request => {
 			try {
-				resolve(JSON.parse(body));
+				resolve(JSON.parse(request.body));
 			} catch (err) {
 				reject(err);
 			}
-		});
+		}).catch(reject);
 	});
 }
 

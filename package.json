@@ -24,5 +24,8 @@
     "got": "^7.0.0",
     "process-exists": "^1.0.0",
     "user-home": "^2.0.0"
+  },
+  "engines": {
+    "node" : ">=4"
   }
 }

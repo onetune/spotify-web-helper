@@ -31,9 +31,9 @@ function getJSON(obj) {
 		}
 		got(obj.url, {
 			headers: obj.headers
-		}).then(request => {
+		}).then(response => {
 			try {
-				resolve(JSON.parse(request.body));
+				resolve(JSON.parse(response.body));
 			} catch (err) {
 				reject(err);
 			}

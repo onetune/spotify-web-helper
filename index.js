@@ -147,7 +147,7 @@ function SpotifyWebHelper(opts) {
 			})
 			.then(function (res) {
 				if (res.error) {
-					throw new Error(res.error.message);
+					reject(new Error(res.error.message));
 				} else {
 					resolve(res.token);
 				}

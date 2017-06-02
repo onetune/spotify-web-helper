@@ -2,7 +2,7 @@ var EventEmitter = require('events').EventEmitter;
 var childProcess = require('child_process');
 var qs = require('querystring');
 var util = require('util');
-var request = require('request');
+var got = require('got');
 var processExists = require('process-exists');
 var chalk = require('chalk');
 

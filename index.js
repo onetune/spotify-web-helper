@@ -2,7 +2,7 @@ var EventEmitter = require('events').EventEmitter;
 var childProcess = require('child_process');
 var qs = require('querystring');
 var util = require('util');
-var request = require('request');
+var got = require('got');
 var processExists = require('process-exists');
 var chalk = require('chalk');
 
@@ -29,20 +29,16 @@ function getJSON(obj) {
 		} else {
 			obj.headers = {'User-Agent': FAKE_USER_AGENT};
 		}
-		request({
-			url: obj.url,
+		got(obj.url, {
 			headers: obj.headers,
 			rejectUnauthorized: false
-		}, function (err, req, body) {
-			if (err) {
-				return reject(err);
-			}
+		}).then(response => {
 			try {
-				resolve(JSON.parse(body));
+				resolve(JSON.parse(response.body));
 			} catch (err) {
 				reject(err);
 			}
-		});
+		}).catch(reject);
 	});
 }
 

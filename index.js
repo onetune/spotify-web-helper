@@ -54,9 +54,9 @@ function parseTime(number) {
 
 function getWebHelperPath() {
 	if (process.platform === 'win32') {
-		return require('user-home') + '\\AppData\\Roaming\\Spotify\\SpotifyWebHelper.exe';
+		return path.join(os.homedir(), '\\AppData\\Roaming\\Spotify\\SpotifyWebHelper.exe');
 	}
-	return require('user-home') + '/Library/Application Support/Spotify/SpotifyWebHelper';
+	return path.join(os.homedir(), '/Library/Application Support/Spotify/SpotifyWebHelper');
 }
 
 function isSpotifyWebHelperRunning() {

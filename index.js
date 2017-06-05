@@ -257,10 +257,14 @@ function SpotifyWebHelper(opts) {
 			this.player.emit('track-will-change', status.track);
 			let hadListeners = this.player.emit('track-change', status.track);
 			if (hadListeners) {
-				process.emitWarning(
-					'\'track-change\' was renamed to \'track-will-change\', please update your listener',
-					'DeprecationWarning'
-				);
+				if (process.emitWarning) {
+					process.emitWarning(
+						'\'track-change\' was renamed to \'track-will-change\', please update your listener',
+						'DeprecationWarning'
+					);
+				} else {
+					console.warn('DeprecationWarning: \'track-change\' was renamed to \'track-will-change\', please update your listener')
+				}
 			}
 		}
 		if (this.status.playing !== status.playing) {
@@ -298,10 +302,14 @@ function SpotifyWebHelper(opts) {
 					this.player.emit('track-will-change', res.track);
 					let hadListeners = this.player.emit('track-change', this.status.track);
 					if (hadListeners) {
-						process.emitWarning(
-							'\'track-change\' was renamed to \'track-will-change\', please update your listener',
-							'DeprecationWarning'
-						);
+						if (process.emitWarning) {
+							process.emitWarning(
+								'\'track-change\' was renamed to \'track-will-change\', please update your listener',
+								'DeprecationWarning'
+							);
+						} else {
+							console.warn('DeprecationWarning: \'track-change\' was renamed to \'track-will-change\', please update your listener')
+						}
 					}
 				}
 				resolve();

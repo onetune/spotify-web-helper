@@ -314,9 +314,14 @@ function SpotifyWebHelper(opts) {
 			}
 		})
 		.then(res => {
-			listen();
 			this.compareStatus(res);
 			this.status = res;
+			let hasError = this.compareStatus(res);
+			if (hasError) {
+				setTimeout(() => listen(), 5000);
+			} else {
+				listen();
+			}
 		})
 		.catch(err => this.player.emit('error', err));
 	};

@@ -1,10 +1,11 @@
 var EventEmitter = require('events').EventEmitter;
 var childProcess = require('child_process');
 var qs = require('querystring');
+var os = require('os');
+var path = require('path');
 var util = require('util');
 var got = require('got');
 var processExists = require('process-exists');
-var chalk = require('chalk');
 
 var spotifyWebHelperWinProcRegex;
 
@@ -54,9 +55,9 @@ function parseTime(number) {
 
 function getWebHelperPath() {
 	if (process.platform === 'win32') {
-		return require('user-home') + '\\AppData\\Roaming\\Spotify\\SpotifyWebHelper.exe';
+		return path.join(os.homedir(), '\\AppData\\Roaming\\Spotify\\SpotifyWebHelper.exe');
 	}
-	return require('user-home') + '/Library/Application Support/Spotify/SpotifyWebHelper';
+	return path.join(os.homedir(), '/Library/Application Support/Spotify/SpotifyWebHelper');
 }
 
 function isSpotifyWebHelperRunning() {
@@ -256,7 +257,14 @@ function SpotifyWebHelper(opts) {
 			this.player.emit('track-will-change', status.track);
 			let hadListeners = this.player.emit('track-change', status.track);
 			if (hadListeners) {
-				console.log(chalk.yellow(`WARN: 'track-change' was renamed to 'track-will-change'. Please update your listener.`))
+				if (process.emitWarning) {
+					process.emitWarning(
+						'\'track-change\' was renamed to \'track-will-change\', please update your listener',
+						'DeprecationWarning'
+					);
+				} else {
+					console.warn('DeprecationWarning: \'track-change\' was renamed to \'track-will-change\', please update your listener')
+				}
 			}
 		}
 		if (this.status.playing !== status.playing) {
@@ -294,7 +302,14 @@ function SpotifyWebHelper(opts) {
 					this.player.emit('track-will-change', res.track);
 					let hadListeners = this.player.emit('track-change', this.status.track);
 					if (hadListeners) {
-						console.log(chalk.yellow(`WARN: 'track-change' was renamed to 'track-will-change'. Please update your listener.`))
+						if (process.emitWarning) {
+							process.emitWarning(
+								'\'track-change\' was renamed to \'track-will-change\', please update your listener',
+								'DeprecationWarning'
+							);
+						} else {
+							console.warn('DeprecationWarning: \'track-change\' was renamed to \'track-will-change\', please update your listener')
+						}
 					}
 				}
 				resolve();

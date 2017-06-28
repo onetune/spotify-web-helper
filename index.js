@@ -282,7 +282,6 @@ function SpotifyWebHelper(opts) {
 				stopSeekingInterval.call(this);
 			}
 		}
-		if (Math.abs(this.status.playing_position - status.playing_position) > 5) {
 		// Guarantee seekingInterval won't affect the seek event
 		if (Math.abs(this.status.playing_position - status.playing_position) > (2 * SEEK_INTERVAL_LENGTH) / 1000) {
 			this.player.emit('seek', status.playing_position);

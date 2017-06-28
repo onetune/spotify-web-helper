@@ -234,6 +234,7 @@ function SpotifyWebHelper(opts) {
 	};
 	this.player.seekTo = seconds => {
 		this.status.playing_position = seconds; // eslint-disable-line camelcase
+		this.player.emit('seek', seconds);
 		return this.player.play(this.status.track.track_resource.uri + '#' + parseTime(seconds));
 	};
 	this.status = null;
@@ -278,6 +279,9 @@ function SpotifyWebHelper(opts) {
 				this.player.emit('pause');
 				stopSeekingInterval.call(this);
 			}
+		}
+		if (Math.abs(this.status.playing_position - status.playing_position) > 5) {
+			this.player.emit('seek', status.playing_position);
 		}
 	};
 	var getStatus = () => {

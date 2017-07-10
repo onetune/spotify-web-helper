@@ -20,6 +20,8 @@ var FAKE_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537
 var ORIGIN_HEADER = {Origin: 'https://open.spotify.com'};
 var KEEPALIVE_HEADER = {Connection: 'keep-alive', Origin: 'https://open.spotify.com'};
 
+var SEEK_INTERVAL_LENGTH = 250;
+
 function getJSON(obj) {
 	return new Promise(function (resolve, reject) {
 		if (obj.params) {
@@ -234,14 +236,15 @@ function SpotifyWebHelper(opts) {
 	};
 	this.player.seekTo = seconds => {
 		this.status.playing_position = seconds; // eslint-disable-line camelcase
+		this.player.emit('seek', seconds);
 		return this.player.play(this.status.track.track_resource.uri + '#' + parseTime(seconds));
 	};
 	this.status = null;
 	var seekingInterval = null;
 	var startSeekingInterval = function () {
 		seekingInterval = setInterval(() => {
-			this.status.playing_position += 0.25; // eslint-disable-line camelcase
-		}, 250);
+			this.status.playing_position += SEEK_INTERVAL_LENGTH / 1000; // eslint-disable-line camelcase
+		}, SEEK_INTERVAL_LENGTH);
 	};
 	var stopSeekingInterval = function () {
 		clearInterval(seekingInterval);
@@ -278,6 +281,10 @@ function SpotifyWebHelper(opts) {
 				this.player.emit('pause');
 				stopSeekingInterval.call(this);
 			}
+		}
+		// Guarantee seekingInterval won't affect the seek event
+		if (Math.abs(this.status.playing_position - status.playing_position) > (2 * SEEK_INTERVAL_LENGTH) / 1000) {
+			this.player.emit('seek', status.playing_position);
 		}
 	};
 	var getStatus = () => {

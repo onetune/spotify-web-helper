@@ -9,6 +9,9 @@ helper.player.on('ready', () => {
 	helper.player.on('pause', function () {
 		console.log('paused');
 	});
+	helper.player.on('seek', function (newPosition) {
+		console.log('sought', newPosition);
+	});
 	helper.player.on('end', function () {
 		console.log('ended');
 	});

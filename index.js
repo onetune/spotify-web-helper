@@ -34,7 +34,8 @@ function getJSON(obj) {
 		}
 		got(obj.url, {
 			headers: obj.headers,
-			rejectUnauthorized: false
+			rejectUnauthorized: false,
+			useElectronNet: false
 		}).then(response => {
 			try {
 				resolve(JSON.parse(response.body));

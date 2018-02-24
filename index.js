@@ -105,13 +105,13 @@ function startSpotifyWebHelper() {
 		});
 		child.unref();
 		isSpotifyWebHelperRunning()
-			.then(function (isRunning) {
-				if (isRunning) {
-					resolve(true);
-				} else {
-					reject(new Error('Cannot start Spotify.'));
-				}
-			});
+		.then(function (isRunning) {
+			if (isRunning) {
+				resolve(true);
+			} else {
+				reject(new Error('Cannot start Spotify.'));
+			}
+		});
 	});
 }
 
@@ -129,28 +129,28 @@ function SpotifyWebHelper(opts) {
 				url: this.generateSpotifyUrl('/simplecsrf/token.json'),
 				headers: ORIGIN_HEADER
 			})
-				.then(function (res) {
-					if (res.error) {
-						reject(new Error(res.error.message));
-					} else {
-						resolve(res.token);
-					}
-				})
-				.catch(reject);
+			.then(function (res) {
+				if (res.error) {
+					reject(new Error(res.error.message));
+				} else {
+					resolve(res.token);
+				}
+			})
+			.catch(reject);
 		});
 	};
 	this.ensureSpotifyWebHelper = function () {
 		return new Promise(function (resolve, reject) {
 			isSpotifyWebHelperRunning()
-				.then(isRunning => {
-					if (isRunning) {
-						return resolve();
-					}
-					return startSpotifyWebHelper();
-				})
-				.catch(function (err) {
-					reject(err);
-				});
+			.then(isRunning => {
+				if (isRunning) {
+					return resolve();
+				}
+				return startSpotifyWebHelper();
+			})
+			.catch(function (err) {
+				reject(err);
+			});
 		});
 	};
 	this.generateSpotifyUrl = function (url, port) {
@@ -334,29 +334,29 @@ function SpotifyWebHelper(opts) {
 					csrf: this.csrftoken
 				}
 			})
-				.then(res => {
-					this.status = res;
-					this.player.emit('ready');
-					this.player.emit('status-will-change', res);
-					if (res.playing) {
-						this.player.emit('play');
-						startSeekingInterval.call(this);
-						this.player.emit('track-will-change', res.track);
-						let hadListeners = this.player.emit('track-change', this.status.track);
-						if (hadListeners) {
-							if (process.emitWarning) {
-								process.emitWarning(
-									'\'track-change\' was renamed to \'track-will-change\', please update your listener',
-									'DeprecationWarning'
-								);
-							} else {
-								console.warn('DeprecationWarning: \'track-change\' was renamed to \'track-will-change\', please update your listener')
-							}
+			.then(res => {
+				this.status = res;
+				this.player.emit('ready');
+				this.player.emit('status-will-change', res);
+				if (res.playing) {
+					this.player.emit('play');
+					startSeekingInterval.call(this);
+					this.player.emit('track-will-change', res.track);
+					let hadListeners = this.player.emit('track-change', this.status.track);
+					if (hadListeners) {
+						if (process.emitWarning) {
+							process.emitWarning(
+								'\'track-change\' was renamed to \'track-will-change\', please update your listener',
+								'DeprecationWarning'
+							);
+						} else {
+							console.warn('DeprecationWarning: \'track-change\' was renamed to \'track-will-change\', please update your listener')
 						}
 					}
-					resolve();
-				})
-				.catch(reject);
+				}
+				resolve();
+			})
+			.catch(reject);
 		});
 	};
 	var listen = () => {
@@ -370,22 +370,22 @@ function SpotifyWebHelper(opts) {
 				csrf: this.csrftoken
 			}
 		})
-			.then(res => {
-				this.compareStatus(res);
-				this.status = res;
-				let hasError = this.compareStatus(res);
-				if (hasError) {
-					setTimeout(() => listen(), 5000);
-				} else {
-					listen();
-				}
-			})
-			.catch(err => this.player.emit('error', err));
+		.then(res => {
+			this.compareStatus(res);
+			this.status = res;
+			let hasError = this.compareStatus(res);
+			if (hasError) {
+				setTimeout(() => listen(), 5000);
+			} else {
+				listen();
+			}
+		})
+		.catch(err => this.player.emit('error', err));
 	};
 
 	this.ensureSpotifyWebHelper()
 		.then(() => this.detectPort())
-		/*.catch(err => this.player.emit('error', err))*/;
+		.catch(err => this.player.emit('error', err));
 }
 // Possible error: need to wait until actually started / spotify not installed
 module.exports = SpotifyWebHelper;

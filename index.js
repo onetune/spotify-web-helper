@@ -220,7 +220,6 @@ function SpotifyWebHelper(opts) {
 						return getStatus();
 					})
 					.then(() => {
-						console.log("START");
 						return listen();
 					})
 					.catch(err => this.player.emit('error', err));

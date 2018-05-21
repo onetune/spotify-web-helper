@@ -61,7 +61,12 @@ helper.player.on('ready', () => {
 
 #### helper.status
  - `<`[`SpotifyStatus`](#typedef-spotifystatus)`>`
-
+ 
+ Gets the current saved status.
+#### helper.getStatus()
+ - `<`[`SpotifyStatus`](#typedef-spotifystatus)`>`
+ 
+ Refetches the status from Spotify and returns it.
 
 
 ### Class: PlayerEventEmitter ###

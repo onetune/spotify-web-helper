@@ -20,8 +20,10 @@
   },
   "homepage": "https://github.com/onetune/spotify-web-helper#readme",
   "dependencies": {
+    "debug": "^3.1.0",
     "got": "^7.0.0",
-    "process-exists": "^1.0.0"
+    "process-exists": "^1.0.0",
+    "process-list": "^1.2.2"
   },
   "engines": {
     "node": ">=4"

@@ -5,9 +5,15 @@ var os = require('os');
 var path = require('path');
 var util = require('util');
 var got = require('got');
-var processExists = require('process-exists');
+var debugInfo = require('debug')('swh:info');
+var debugError = require('debug')('swh:error');
+var processStatus = require('./lib/process-status');
 
-var spotifyWebHelperWinProcRegex;
+// Possible process status values (for Spotify.exe, not SpotifyWebHelper.exe)
+var NOT_RUNNING = 0;
+var RUNNING = 1;
+var SHUTTING_DOWN = 2;
+var spotifyStatus = NOT_RUNNING;
 
 var START_HTTPS_PORT = 4370;
 var END_HTTPS_PORT = 4379;
@@ -75,42 +81,6 @@ function getWebHelperPath() {
   );
 }
 
-function isSpotifyWebHelperRunning() {
-  return new Promise(function (resolve, reject) {
-    if (process.platform === 'darwin') {
-      return processExists('SpotifyWebHelper', function (err, exists) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(exists);
-        }
-      });
-    } else if (process.platform === 'win32') {
-      var ps = require('./lib/wintools-ps');
-
-      ps(function (err, lst) {
-        if (err) {
-          return reject(err);
-        }
-        spotifyWebHelperWinProcRegex =
-          spotifyWebHelperWinProcRegex ||
-          new RegExp('spotifywebhelper.exe', 'i');
-
-        for (var k in lst) {
-          if (spotifyWebHelperWinProcRegex.test(lst[k].desc)) {
-            return resolve(true);
-          }
-          spotifyWebHelperWinProcRegex.lastIndex = 0;
-        }
-        return resolve(false);
-      });
-    } else {
-      // SpotifyWebHelper starts with Spotify by default in Linux
-      return resolve(true);
-    }
-  });
-}
-
 function startSpotifyWebHelper() {
   return new Promise(function (resolve, reject) {
     var child = childProcess.spawn(getWebHelperPath(), { detached: true });
@@ -118,11 +88,11 @@ function startSpotifyWebHelper() {
       reject(new Error('Spotify is not installed. ' + err.message));
     });
     child.unref();
-    isSpotifyWebHelperRunning().then(function (isRunning) {
+    processStatus.of('SpotifyWebHelper').then(function (isRunning) {
       if (isRunning) {
         resolve(true);
       } else {
-        reject(new Error('Cannot start Spotify.'));
+        reject(new Error('Cannot start Spotify Web Helper.'));
       }
     });
   });
@@ -154,16 +124,14 @@ function SpotifyWebHelper(opts) {
   };
   this.ensureSpotifyWebHelper = function () {
     return new Promise(function (resolve, reject) {
-      isSpotifyWebHelperRunning()
+      processStatus.of('SpotifyWebHelper')
         .then(isRunning => {
           if (isRunning) {
             return resolve();
           }
           return startSpotifyWebHelper();
         })
-        .catch(function (err) {
-          reject(err);
-        });
+        .catch(reject);
     });
   };
   this.generateSpotifyUrl = function (url, port = localPort) {
@@ -185,12 +153,25 @@ function SpotifyWebHelper(opts) {
     });
   };
   this.checkForError = status => {
+    /*
+    // This status isn't reliable, as it's very random
     if (!status.open_graph_state) {
       this.player.emit('error', new Error('No user logged in'));
       return true;
     }
+    */
+
     if (status.error) {
-      this.player.emit('error', new Error(status.error.message));
+      debugError(status.error.message);
+
+      if (status.error.message === 'Invalid OAuth token') {
+        // TODO: It would be great to have something more precise than just the message to check.
+        // Unfortunately, I haven't been able to reproduce this case.
+        // At any rate, a likely expired OAuth token just means we have to reinitialize.
+        SpotifyWebHelper.call(this, opts);
+        return false; // Prevent error handling, since we start from the beginning anyway
+      }
+
       return true;
     }
     return false;
@@ -222,19 +203,37 @@ function SpotifyWebHelper(opts) {
   this.detectPort = function () {
     const MAX_TIMEOUT = 5000;
 
-    return Promise.race([
-      this.checkPorts(START_HTTPS_PORT, END_HTTPS_PORT),
-      this.checkPorts(START_HTTP_PORT, END_HTTP_PORT),
-      new Promise((resolve, reject) =>
-        setTimeout(() => reject('No port found in range'), MAX_TIMEOUT)
-      )
-    ])
-      .then(data => {
-        localPort = data;
-      })
-      .catch(err => {
-        throw err;
-      });
+    return new Promise((resolve, reject) => {
+      const tryToConnect = () => {
+        Promise.race([
+          this.checkPorts(START_HTTPS_PORT, END_HTTPS_PORT),
+          this.checkPorts(START_HTTP_PORT, END_HTTP_PORT),
+          new Promise((innerResolve) => {
+            // Keep trying until connection can be established.
+            // Probably means that Spotify isn't running.
+
+            // Continuously trying this is possibly cheaper on Windows than checking the processes list
+            setTimeout(() => innerResolve('retry'), MAX_TIMEOUT);
+          })
+        ])
+        .then(data => {
+          if(data === 'retry') {
+            debugInfo('No port found in range. Retrying...');
+            tryToConnect();
+          } else {
+            if(spotifyStatus === NOT_RUNNING) {
+              spotifyStatus = RUNNING; // If service is available, Spotify must be running
+              debugInfo('Spotify was just started.');
+              this.player.emit('open');
+            }
+            localPort = data;
+            resolve();
+          }
+        })
+        .catch(err => this.player.emit('error', err));
+      };
+      tryToConnect();
+    });
   };
 
   this.player = new EventEmitter();
@@ -325,10 +324,12 @@ function SpotifyWebHelper(opts) {
         this.player.emit('play');
         startSeekingInterval.call(this);
       } else {
-        if (Math.abs(status.playing_position - status.track.length) <= 1) {
+        // When user shuts down Spotify, playing status changes but there is no track property available
+        if (!status.hasOwnProperty('track') || Math.abs(status.playing_position - status.track.length) <= 1) {
           this.player.emit('end');
+        } else {
+          this.player.emit('pause');
         }
-        this.player.emit('pause');
         stopSeekingInterval.call(this);
       }
     }
@@ -397,20 +398,75 @@ function SpotifyWebHelper(opts) {
         csrf: this.csrftoken
       }
     })
-      .then(res => {
-        this.compareStatus(res);
-        this.status = res;
-        let hasError = this.compareStatus(res);
-        if (hasError) {
-          setTimeout(() => listen(), 5000);
-        } else {
-          listen();
-        }
-      })
-      .catch(err => this.player.emit('error', err));
+    .then(res => {
+      debugInfo('Listening...');
+
+      if(res.online === false) {
+        this.player.emit('closing');
+      }
+
+      this.status = res;
+      let hasError = this.compareStatus(res);
+      if (hasError) {
+        setTimeout(() => listen(), 5000);
+      } else {
+        listen();
+      }
+    })
+    .catch(err => {
+      // When Spotify is shut down, all sorts of errors can occur.
+      // ECONNREFUSED or 511 - Network Authentication Required
+      // Most reasonable thing to do: Ignore and reinitialize
+      // Emitting it would mean we'd force the user having to handle many "nonsense" errors.
+      //this.player.emit('error', err);
+
+      if (spotifyStatus === RUNNING) {
+        // We can only guess
+        debugInfo('Spotify is shutting down...');
+        this.player.emit('closing');
+
+        let retries = 0;
+        const waitForShutdown = () => {
+          return new Promise((resolve, reject) => {
+            processStatus.of('Spotify')
+            .then(isRunning => {
+              if (isRunning) {
+                if (retries > 15) // ~30 seconds
+                  reject();
+                retries++;
+                debugInfo('Waiting for shutdown...');
+                setTimeout(waitForShutdown, 2000);
+              } else {
+                resolve();
+              }
+            })
+            .catch(err => this.player.emit('error', err))
+          });
+        };
+
+        waitForShutdown()
+        .then(() => {
+          // Go back to scanning until port becomes available
+          debugInfo('Spotify quit, start waiting for connection again...');
+          this.player.emit('close');
+          SpotifyWebHelper.call(this, opts);
+        })
+        .catch(() => SpotifyWebHelper.call(this, opts));
+      } else {
+        SpotifyWebHelper.call(this, opts);
+      }
+    });
   };
 
-  this.ensureSpotifyWebHelper()
+  // TODO: first, check whether Spotify is running (Spotify.exe)
+  // if it's not, set a flag to enable emitting of "open" event later
+  // see: https://github.com/onetune/spotify-web-helper/issues/15
+  //this.ensureSpotifyWebHelper()
+  processStatus.of('Spotify')
+    .then((isRunning) => {
+      spotifyStatus = isRunning ? RUNNING : NOT_RUNNING;
+    })
+    .then(() => this.ensureSpotifyWebHelper())
     .then(() => this.detectPort())
     .then(() => this.getOauthToken())
     .then(oauthtoken => {

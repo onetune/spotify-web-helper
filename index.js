@@ -5,8 +5,7 @@ var os = require('os');
 var path = require('path');
 var util = require('util');
 var got = require('got');
-var debugInfo = require('debug')('swh:info');
-var debugError = require('debug')('swh:error');
+var debug = require('debug')('swh');
 var processStatus = require('./lib/process-status');
 
 var isSpotifyRunning = false;
@@ -101,6 +100,13 @@ function SpotifyWebHelper(opts) {
 
   opts = opts || {};
   var localPort = opts.port || START_HTTPS_PORT;
+  var intervals = opts.intervals || {
+    checkIsRunning: 5000,
+    checkIsShutdown: 2000,
+    delayAfterStart: 3000,
+    delayAfterError: 5000,
+    retryHelperConnection: 5000,
+  };
 
   this.getCsrfToken = () => {
     return new Promise((resolve, reject) => {
@@ -132,14 +138,19 @@ function SpotifyWebHelper(opts) {
           if(isRunning) {
             if(!isSpotifyRunning) {
               isSpotifyRunning = true;
-              debugInfo('Spotify was just started.');
+              debug('Spotify was just started.');
               this.player.emit('open');
-            }
 
-            resolve();
+              // Give Spotify a few seconds to finish startup.
+              // Prevents "User not logged on" errors.
+              setTimeout(resolve, intervals.delayAfterStart);
+            } else {
+              // Spotify has already been running
+              resolve();
+            }
           } else {
-            debugInfo('Waiting for Spotify to start...');
-            setTimeout(waitForSpotify, 5000);
+            debug('Waiting for Spotify to start...');
+            setTimeout(waitForSpotify, intervals.checkIsRunning);
           }
         })
         .catch(reject);
@@ -171,25 +182,24 @@ function SpotifyWebHelper(opts) {
       getJSON({
         url: 'http://open.spotify.com/token'
       })
-        .then(function (res) {
-          resolve(res.t);
-        })
-        .catch(reject);
+      .then(function (res) {
+        resolve(res.t);
+      })
+      .catch(reject);
     });
   };
   this.checkForError = status => {
     if (status.error) {
-      debugError(status.error.message);
-
       if (status.error.message === 'Invalid OAuth token') {
         // TODO: It would be great to have something more precise than just the message to check.
         // Unfortunately, I haven't been able to reproduce this case.
-        // At any rate, a likely expired OAuth token just means we have to reinitialize to grab
+        // At any rate, an invalid OAuth token just means we probably simply have to reinitialize to grab
         // a new one.
         init();
         return false; // Don't trigger error handling, since we start from the beginning anyway
       }
 
+      this.player.emit('error', new Error(status.error.message));
       return true;
     }
     return false;
@@ -219,20 +229,18 @@ function SpotifyWebHelper(opts) {
   };
   // Race to find the first succesful port
   this.detectPort = function () {
-    const MAX_TIMEOUT = 5000;
-
     return new Promise((resolve, reject) => {
       const tryToConnect = () => {
         Promise.race([
           this.checkPorts(START_HTTPS_PORT, END_HTTPS_PORT),
           this.checkPorts(START_HTTP_PORT, END_HTTP_PORT),
           new Promise((innerResolve) => {
-            setTimeout(() => innerResolve('retry'), MAX_TIMEOUT);
+            setTimeout(() => innerResolve('retry'), intervals.retryHelperConnection);
           })
         ])
         .then(data => {
           if(data === 'retry') {
-            debugInfo('No port found in range. Retrying...');
+            debug('No port found in range. Retrying...');
             tryToConnect();
           } else {
             localPort = data;
@@ -310,19 +318,6 @@ function SpotifyWebHelper(opts) {
       this.status.track.track_resource.uri !== status.track.track_resource.uri
     ) {
       this.player.emit('track-will-change', status.track);
-      let hadListeners = this.player.emit('track-change', status.track);
-      if (hadListeners) {
-        if (process.emitWarning) {
-          process.emitWarning(
-            "'track-change' was renamed to 'track-will-change', please update your listener",
-            'DeprecationWarning'
-          );
-        } else {
-          console.warn(
-            "DeprecationWarning: 'track-change' was renamed to 'track-will-change', please update your listener"
-          );
-        }
-      }
     }
     if (this.status.playing !== status.playing) {
       if (status.playing) {
@@ -369,22 +364,6 @@ function SpotifyWebHelper(opts) {
             this.player.emit('play');
             startSeekingInterval.call(this);
             this.player.emit('track-will-change', res.track);
-            let hadListeners = this.player.emit(
-              'track-change',
-              this.status.track
-            );
-            if (hadListeners) {
-              if (process.emitWarning) {
-                process.emitWarning(
-                  "'track-change' was renamed to 'track-will-change', please update your listener",
-                  'DeprecationWarning'
-                );
-              } else {
-                console.warn(
-                  "DeprecationWarning: 'track-change' was renamed to 'track-will-change', please update your listener"
-                );
-              }
-            }
           }
           resolve();
         })
@@ -393,7 +372,6 @@ function SpotifyWebHelper(opts) {
   };
 
   var waitForShutdown = () => {
-    let SHUTDOWN_CHECK_INTERVAL = 2000;
     return new Promise((resolve, reject) => {
       const checkStatus = (retries) => {
         processStatus.of('Spotify')
@@ -401,8 +379,8 @@ function SpotifyWebHelper(opts) {
           if (isRunning) {
             if (retries > 15)
               reject();
-            debugInfo('Waiting for shutdown...');
-            setTimeout(checkStatus.bind(null, retries + 1), SHUTDOWN_CHECK_INTERVAL);
+            debug('Waiting for shutdown...');
+            setTimeout(checkStatus.bind(null, retries + 1), intervals.checkIsShutdown);
           } else {
             resolve();
           }
@@ -425,16 +403,16 @@ function SpotifyWebHelper(opts) {
       }
     })
     .then(res => {
-      debugInfo('Listening...');
-      this.status = res;
+      debug('Processing status.');
 
+      // Spotify is being shut down
       if(res.online === false) {
         this.player.emit('closing');
 
         // Restart Web Helper once Spotify process is dead.
         waitForShutdown()
         .then(() => {
-          debugInfo('Spotify quit, start waiting for connection again...');
+          debug('Spotify quit, start waiting for connection again.');
           this.player.emit('close');
           init();
         })
@@ -447,20 +425,15 @@ function SpotifyWebHelper(opts) {
         // Give Spotify a few seconds to recover
         // (Helps with e.g. "User not logged on" errors on starting Spotify, since the user usually WILL
         // be logged on within a second or two...)
-        setTimeout(listen, 5000);
+        setTimeout(listen, intervals.delayAfterError);
       } else {
+        // Compare new and old status stored in this.status
         this.compareStatus(res);
+        this.status = res;
         listen();
       }
     })
-    .catch(err => {
-      // Most errors Spotify throws seem to be related to Startup/Shutdown process and aren't
-      // really helpful. Things like: ECONNREFUSED or 511 - Network Authentication Required
-      // Most reasonable thing to do: Ignore and reinitialize
-      // Emitting it would mean we'd force the user having to handle many "nonsense" errors.
-      debugError(err);
-      init();
-    });
+    .catch(err => this.player.emit('error', err));
   };
 
   var init = () => {
@@ -477,6 +450,7 @@ function SpotifyWebHelper(opts) {
       return getStatusAndEmit();
     })
     .then(() => {
+      debug('Starting to listen for events.');
       return listen();
     })
     .catch(err => this.player.emit('error', err));

@@ -8,8 +8,6 @@ var got = require('got');
 var debug = require('debug')('swh');
 var processStatus = require('./lib/process-status');
 
-var isSpotifyRunning = false;
-
 var START_HTTPS_PORT = 4370;
 var END_HTTPS_PORT = 4379;
 var START_HTTP_PORT = 4380;
@@ -83,7 +81,7 @@ function startSpotifyWebHelper() {
       reject(new Error('Spotify is not installed. ' + err.message));
     });
     child.unref();
-    processStatus.of('SpotifyWebHelper').then(function (isRunning) {
+    processStatus.of(processStatus.SPOTIFY_WEB_HELPER).then(function (isRunning) {
       if (isRunning) {
         resolve(true);
       } else {
@@ -100,13 +98,13 @@ function SpotifyWebHelper(opts) {
 
   opts = opts || {};
   var localPort = opts.port || START_HTTPS_PORT;
-  var intervals = opts.intervals || {
+  var intervals = Object.assign({}, {
     checkIsRunning: 5000,
     checkIsShutdown: 2000,
     delayAfterStart: 3000,
     delayAfterError: 5000,
-    retryHelperConnection: 5000,
-  };
+    retryHelperConnection: 5000
+  }, opts.intervals);
 
   this.getCsrfToken = () => {
     return new Promise((resolve, reject) => {
@@ -129,7 +127,7 @@ function SpotifyWebHelper(opts) {
 
     return new Promise((resolve, reject) => {
       const waitForSpotify = () => {
-        processStatus.of('Spotify')
+        processStatus.of(processStatus.SPOTIFY)
         .then((isRunning) => {
           // Save status on first call, to make emitting 'open' event possible
           if(isSpotifyRunning === null)
@@ -160,7 +158,7 @@ function SpotifyWebHelper(opts) {
   };
   this.ensureSpotifyWebHelper = () => {
     return new Promise(function (resolve, reject) {
-      processStatus.of('SpotifyWebHelper')
+      processStatus.of(processStatus.SPOTIFY_WEB_HELPER)
         .then(isRunning => {
           if (isRunning) {
             return resolve();
@@ -191,10 +189,7 @@ function SpotifyWebHelper(opts) {
   this.checkForError = status => {
     if (status.error) {
       if (status.error.message === 'Invalid OAuth token') {
-        // TODO: It would be great to have something more precise than just the message to check.
-        // Unfortunately, I haven't been able to reproduce this case.
-        // At any rate, an invalid OAuth token just means we probably simply have to reinitialize to grab
-        // a new one.
+        // We probably simply have to reinitialize to grab a new OAuth token
         init();
         return false; // Don't trigger error handling, since we start from the beginning anyway
       }
@@ -374,7 +369,7 @@ function SpotifyWebHelper(opts) {
   var waitForShutdown = () => {
     return new Promise((resolve, reject) => {
       const checkStatus = (retries) => {
-        processStatus.of('Spotify')
+        processStatus.of(processStatus.SPOTIFY)
         .then(isRunning => {
           if (isRunning) {
             if (retries > 15)

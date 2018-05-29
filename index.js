@@ -348,6 +348,7 @@ function SpotifyWebHelper(opts) {
     }
   });
 
+  // Executed only once, after OAuth process is done.
   var getStatusAndEmit = () => {
     return new Promise((resolve, reject) => {
       this.getStatus()

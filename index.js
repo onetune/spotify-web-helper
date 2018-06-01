@@ -209,9 +209,18 @@ function SpotifyWebHelper(opts) {
         }
       })
         .then(() => {
+          debug(`Port ${port}: SUCCESS`);
           resolve(port);
         })
-        .catch(err => { });
+        .catch(err => {
+          if (err.statusCode === 404) {
+            debug(`Port ${port}: 404`);
+          } else if (err instanceof got.RequestError) {
+            debug(`Port ${port}: RequestError`);
+          } else {
+            this.player.emit('error', err);
+          }
+        });
     });
   };
   // Return the first successful port
@@ -222,8 +231,9 @@ function SpotifyWebHelper(opts) {
       )
     );
   };
-  // Race to find the first succesful port
+  // Race to find the first successful port
   this.detectPort = function () {
+    debug("Detecting the port Spotify's service runs on...");
     return new Promise((resolve, reject) => {
       const tryToConnect = () => {
         Promise.race([

@@ -1,3 +1,8 @@
+Please note that because of a recent Spotify update, the library is not working at the moment.
+Discussion here: https://github.com/onetune/spotify-web-helper/issues/41
+
+---
+
 # Spotify Web Helper for node.js
 
 This is a rewrite of the excellent [node-spotify-webhelper](https://www.npmjs.com/package/node-spotify-webhelper), but with support for events, so you don't have to do `getStatus()` all the time. It also is faster, and starts SpotifyWebHelper on OS X, not just on Windows.  

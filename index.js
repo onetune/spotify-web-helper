@@ -5,9 +5,8 @@ var os = require('os');
 var path = require('path');
 var util = require('util');
 var got = require('got');
-var processExists = require('process-exists');
-
-var spotifyWebHelperWinProcRegex;
+var debug = require('debug')('swh');
+var processStatus = require('./lib/process-status');
 
 var START_HTTPS_PORT = 4370;
 var END_HTTPS_PORT = 4379;
@@ -75,42 +74,6 @@ function getWebHelperPath() {
   );
 }
 
-function isSpotifyWebHelperRunning() {
-  return new Promise(function (resolve, reject) {
-    if (process.platform === 'darwin') {
-      return processExists('SpotifyWebHelper', function (err, exists) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(exists);
-        }
-      });
-    } else if (process.platform === 'win32') {
-      var ps = require('./lib/wintools-ps');
-
-      ps(function (err, lst) {
-        if (err) {
-          return reject(err);
-        }
-        spotifyWebHelperWinProcRegex =
-          spotifyWebHelperWinProcRegex ||
-          new RegExp('spotifywebhelper.exe', 'i');
-
-        for (var k in lst) {
-          if (spotifyWebHelperWinProcRegex.test(lst[k].desc)) {
-            return resolve(true);
-          }
-          spotifyWebHelperWinProcRegex.lastIndex = 0;
-        }
-        return resolve(false);
-      });
-    } else {
-      // SpotifyWebHelper starts with Spotify by default in Linux
-      return resolve(true);
-    }
-  });
-}
-
 function startSpotifyWebHelper() {
   return new Promise(function (resolve, reject) {
     var child = childProcess.spawn(getWebHelperPath(), { detached: true });
@@ -118,11 +81,11 @@ function startSpotifyWebHelper() {
       reject(new Error('Spotify is not installed. ' + err.message));
     });
     child.unref();
-    isSpotifyWebHelperRunning().then(function (isRunning) {
+    processStatus.of(processStatus.SPOTIFY_WEB_HELPER).then(function (isRunning) {
       if (isRunning) {
         resolve(true);
       } else {
-        reject(new Error('Cannot start Spotify.'));
+        reject(new Error('Cannot start Spotify Web Helper.'));
       }
     });
   });
@@ -135,6 +98,13 @@ function SpotifyWebHelper(opts) {
 
   opts = opts || {};
   var localPort = opts.port || START_HTTPS_PORT;
+  var intervals = Object.assign({}, {
+    checkIsRunning: 5000,
+    checkIsShutdown: 2000,
+    delayAfterStart: 3000,
+    delayAfterError: 5000,
+    retryHelperConnection: 5000
+  }, opts.intervals);
 
   this.getCsrfToken = () => {
     return new Promise((resolve, reject) => {
@@ -152,18 +122,50 @@ function SpotifyWebHelper(opts) {
         .catch(reject);
     });
   };
-  this.ensureSpotifyWebHelper = function () {
+  this.ensureSpotify = () => {
+    isSpotifyRunning = null;
+
+    return new Promise((resolve, reject) => {
+      const waitForSpotify = () => {
+        processStatus.of(processStatus.SPOTIFY)
+        .then((isRunning) => {
+          // Save status on first call, to make emitting 'open' event possible
+          if(isSpotifyRunning === null)
+            isSpotifyRunning = isRunning;
+
+          if(isRunning) {
+            if(!isSpotifyRunning) {
+              isSpotifyRunning = true;
+              debug('Spotify was just started.');
+              this.player.emit('open');
+
+              // Give Spotify a few seconds to finish startup.
+              // Prevents "User not logged on" errors.
+              setTimeout(resolve, intervals.delayAfterStart);
+            } else {
+              // Spotify has already been running
+              resolve();
+            }
+          } else {
+            debug('Waiting for Spotify to start...');
+            setTimeout(waitForSpotify, intervals.checkIsRunning);
+          }
+        })
+        .catch(reject);
+      };
+      waitForSpotify();
+    })
+  };
+  this.ensureSpotifyWebHelper = () => {
     return new Promise(function (resolve, reject) {
-      isSpotifyWebHelperRunning()
+      processStatus.of(processStatus.SPOTIFY_WEB_HELPER)
         .then(isRunning => {
           if (isRunning) {
             return resolve();
           }
           return startSpotifyWebHelper();
         })
-        .catch(function (err) {
-          reject(err);
-        });
+        .catch(reject);
     });
   };
   this.generateSpotifyUrl = function (url, port = localPort) {
@@ -178,18 +180,20 @@ function SpotifyWebHelper(opts) {
       getJSON({
         url: 'http://open.spotify.com/token'
       })
-        .then(function (res) {
-          resolve(res.t);
-        })
-        .catch(reject);
+      .then(function (res) {
+        resolve(res.t);
+      })
+      .catch(reject);
     });
   };
   this.checkForError = status => {
-    if (!status.open_graph_state) {
-      this.player.emit('error', new Error('No user logged in'));
-      return true;
-    }
     if (status.error) {
+      if (status.error.message === 'Invalid OAuth token') {
+        // We probably simply have to reinitialize to grab a new OAuth token
+        init();
+        return false; // Don't trigger error handling, since we start from the beginning anyway
+      }
+
       this.player.emit('error', new Error(status.error.message));
       return true;
     }
@@ -205,9 +209,18 @@ function SpotifyWebHelper(opts) {
         }
       })
         .then(() => {
+          debug(`Port ${port}: SUCCESS`);
           resolve(port);
         })
-        .catch(err => { });
+        .catch(err => {
+          if (err.statusCode === 404) {
+            debug(`Port ${port}: 404`);
+          } else if (err instanceof got.RequestError) {
+            debug(`Port ${port}: RequestError`);
+          } else {
+            this.player.emit('error', err);
+          }
+        });
     });
   };
   // Return the first successful port
@@ -218,23 +231,31 @@ function SpotifyWebHelper(opts) {
       )
     );
   };
-  // Race to find the first succesful port
+  // Race to find the first successful port
   this.detectPort = function () {
-    const MAX_TIMEOUT = 5000;
-
-    return Promise.race([
-      this.checkPorts(START_HTTPS_PORT, END_HTTPS_PORT),
-      this.checkPorts(START_HTTP_PORT, END_HTTP_PORT),
-      new Promise((resolve, reject) =>
-        setTimeout(() => reject('No port found in range'), MAX_TIMEOUT)
-      )
-    ])
-      .then(data => {
-        localPort = data;
-      })
-      .catch(err => {
-        throw err;
-      });
+    debug("Detecting the port Spotify's service runs on...");
+    return new Promise((resolve, reject) => {
+      const tryToConnect = () => {
+        Promise.race([
+          this.checkPorts(START_HTTPS_PORT, END_HTTPS_PORT),
+          this.checkPorts(START_HTTP_PORT, END_HTTP_PORT),
+          new Promise((innerResolve) => {
+            setTimeout(() => innerResolve('retry'), intervals.retryHelperConnection);
+          })
+        ])
+        .then(data => {
+          if(data === 'retry') {
+            debug('No port found in range. Retrying...');
+            tryToConnect();
+          } else {
+            localPort = data;
+            resolve();
+          }
+        })
+        .catch(err => this.player.emit('error', err));
+      };
+      tryToConnect();
+    });
   };
 
   this.player = new EventEmitter();
@@ -293,10 +314,6 @@ function SpotifyWebHelper(opts) {
     clearInterval(seekingInterval);
   };
   this.compareStatus = function (status) {
-    let hasError = this.checkForError(status);
-    if (hasError) {
-      return;
-    }
     this.player.emit('status-will-change', status);
     let hasUri = track =>
       track && track.track_resource && track.track_resource.uri;
@@ -306,29 +323,18 @@ function SpotifyWebHelper(opts) {
       this.status.track.track_resource.uri !== status.track.track_resource.uri
     ) {
       this.player.emit('track-will-change', status.track);
-      let hadListeners = this.player.emit('track-change', status.track);
-      if (hadListeners) {
-        if (process.emitWarning) {
-          process.emitWarning(
-            "'track-change' was renamed to 'track-will-change', please update your listener",
-            'DeprecationWarning'
-          );
-        } else {
-          console.warn(
-            "DeprecationWarning: 'track-change' was renamed to 'track-will-change', please update your listener"
-          );
-        }
-      }
     }
     if (this.status.playing !== status.playing) {
       if (status.playing) {
         this.player.emit('play');
         startSeekingInterval.call(this);
       } else {
-        if (Math.abs(status.playing_position - status.track.length) <= 1) {
+        // When user shuts down Spotify, playing status changes but there is no track property available
+        if (!status.hasOwnProperty('track') || Math.abs(status.playing_position - status.track.length) <= 1) {
           this.player.emit('end');
+        } else {
+          this.player.emit('pause');
         }
-        this.player.emit('pause');
         stopSeekingInterval.call(this);
       }
     }
@@ -341,18 +347,18 @@ function SpotifyWebHelper(opts) {
     }
   };
 
-  this.getStatus = () =>
-    getJSON({
-      url: this.generateSpotifyUrl('/remote/status.json'),
-      headers: ORIGIN_HEADER,
-      params: {
-        returnafter: 1,
-        returnon: RETURN_ON.join(','),
-        oauth: this.oauthtoken,
-        csrf: this.csrftoken
-      }
-    });
+  this.getStatus = () => getJSON({
+    url: this.generateSpotifyUrl('/remote/status.json'),
+    headers: ORIGIN_HEADER,
+    params: {
+      returnafter: 1,
+      returnon: RETURN_ON.join(','),
+      oauth: this.oauthtoken,
+      csrf: this.csrftoken
+    }
+  });
 
+  // Executed only once, after OAuth process is done.
   var getStatusAndEmit = () => {
     return new Promise((resolve, reject) => {
       this.getStatus()
@@ -364,28 +370,33 @@ function SpotifyWebHelper(opts) {
             this.player.emit('play');
             startSeekingInterval.call(this);
             this.player.emit('track-will-change', res.track);
-            let hadListeners = this.player.emit(
-              'track-change',
-              this.status.track
-            );
-            if (hadListeners) {
-              if (process.emitWarning) {
-                process.emitWarning(
-                  "'track-change' was renamed to 'track-will-change', please update your listener",
-                  'DeprecationWarning'
-                );
-              } else {
-                console.warn(
-                  "DeprecationWarning: 'track-change' was renamed to 'track-will-change', please update your listener"
-                );
-              }
-            }
           }
           resolve();
         })
         .catch(err => this.player.emit('error', err));
     });
   };
+
+  var waitForShutdown = () => {
+    return new Promise((resolve, reject) => {
+      const checkStatus = (retries) => {
+        processStatus.of(processStatus.SPOTIFY)
+        .then(isRunning => {
+          if (isRunning) {
+            if (retries > 15)
+              reject();
+            debug('Waiting for shutdown...');
+            setTimeout(checkStatus.bind(null, retries + 1), intervals.checkIsShutdown);
+          } else {
+            resolve();
+          }
+        })
+        .catch(err => this.player.emit('error', err))
+      };
+      checkStatus(0);
+    });
+  };
+
   var listen = () => {
     getJSON({
       url: this.generateSpotifyUrl('/remote/status.json'),
@@ -397,20 +408,43 @@ function SpotifyWebHelper(opts) {
         csrf: this.csrftoken
       }
     })
-      .then(res => {
+    .then(res => {
+      debug('Processing status.');
+
+      // Spotify is being shut down
+      if(res.online === false) {
+        this.player.emit('closing');
+
+        // Restart Web Helper once Spotify process is dead.
+        waitForShutdown()
+        .then(() => {
+          debug('Spotify quit, start waiting for connection again.');
+          this.player.emit('close');
+          init();
+        })
+        .catch(init);
+
+        return;
+      }
+
+      if(this.checkForError(res)) {
+        // Give Spotify a few seconds to recover
+        // (Helps with e.g. "User not logged on" errors on starting Spotify, since the user usually WILL
+        // be logged on within a second or two...)
+        setTimeout(listen, intervals.delayAfterError);
+      } else {
+        // Compare new and old status stored in this.status
         this.compareStatus(res);
         this.status = res;
-        let hasError = this.compareStatus(res);
-        if (hasError) {
-          setTimeout(() => listen(), 5000);
-        } else {
-          listen();
-        }
-      })
-      .catch(err => this.player.emit('error', err));
+        listen();
+      }
+    })
+    .catch(err => this.player.emit('error', err));
   };
 
-  this.ensureSpotifyWebHelper()
+  var init = () => {
+    this.ensureSpotify()
+    .then(() => this.ensureSpotifyWebHelper())
     .then(() => this.detectPort())
     .then(() => this.getOauthToken())
     .then(oauthtoken => {
@@ -422,9 +456,12 @@ function SpotifyWebHelper(opts) {
       return getStatusAndEmit();
     })
     .then(() => {
+      debug('Starting to listen for events.');
       return listen();
     })
     .catch(err => this.player.emit('error', err));
+  };
+  init();
 }
 
 // Possible error: need to wait until actually started / spotify not installed

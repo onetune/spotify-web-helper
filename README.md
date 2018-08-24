@@ -20,37 +20,51 @@ const SpotifyWebHelper = require('spotify-web-helper');
 const helper = SpotifyWebHelper();
 
 helper.player.on('error', err => {
-  if (error.message.match(/No user logged in/)) {
-    // also fires when Spotify client quits
-  } else {
-    // other errors: /Cannot start Spotify/ and /Spotify is not installed/
-  }
+  // Since the introduction of lifecycle events, emitted errors have become rare.
+  // It's still worth having at least a minimum error handler like this one, as  
+  // the process will exit otherwise:
+  // https://nodejs.org/dist/latest/docs/api/events.html#events_error_events
+  console.log(err);
 });
+
+// Lifecyle events
+helper.player.on('open', () => { });
+helper.player.on('closing', () => { });
+helper.player.on('close', () => { });
+
+// Playback events
+helper.player.on('play', () => { });
+helper.player.on('pause', () => { });
+helper.player.on('seek', newPosition => {});
+helper.player.on('end', () => { });
+helper.player.on('track-will-change', track => {});
+helper.player.on('status-will-change', status => {});
+
+// Connection to Spotify's service was established.
 helper.player.on('ready', () => {
-
-  // Playback events
-  helper.player.on('play', () => { });
-  helper.player.on('pause', () => { });
-  helper.player.on('seek', newPosition => {});
-  helper.player.on('end', () => { });
-  helper.player.on('track-will-change', track => {});
-  helper.player.on('status-will-change', status => {});
-
   // Playback control. These methods return promises
   helper.player.play('spotify:track:4uLU6hMCjMI75M1A2tKUQC');
   helper.player.pause();
   helper.player.seekTo(60); // 60 seconds
-
+  
   // Get current playback status, including up to date playing position
   console.log(helper.status);
   // 'status': {
-  //    'track': ...,
-  //    'shuffle': ...,
-  //    'playing_position': ...
-  //  }
-
+  //   'track': ...,
+  //   'shuffle': ...,
+  //   'playing_position': ...
+  // }
 });
 ````
+
+## Debug
+
+[Debug messages](https://github.com/visionmedia/debug) are printed to the console if you 
+set the environment variable `DEBUG`:
+
+`DEBUG=*` or `DEBUG=swh`
+
+Currently, these messages are only related to the lifecycle, no data is being output.
 
 ## API
 
@@ -60,6 +74,34 @@ helper.player.on('ready', () => {
 
  - `opts` `<object>` Options.
    - `opts.port` `<number>` Web helper port. Default is 4370.
+   - `opts.intervals` `<object>` Intervals between certain operations. Configurable 
+     intervals and their default values are: 
+     ``` 
+     {
+         // Interval between checks whether Spotify is in fact running.
+         // Related to the 'open' event.
+         checkIsRunning: 5000,
+         
+         // Interval between checks whether Spotify has already shut down.
+         // These check are done after the 'closing' event and will trigger 'close'.  
+         checkIsShutdown: 2000,
+         
+         // When Spotify is first started, it needs a bit of time to finish the startup 
+         // process, despite the fact that its service would already be ready to accept 
+         // requests. Hence, if this delay is overwritten with a value that is too short, 
+         // errors like 'No user logged on' may get triggered.
+         delayAfterStart: 3000,
+         
+         // Give Spotify a few seconds to recover after an error has happened.
+         delayAfterError: 5000,
+         
+         // Spotify's service should always be running or started by SpotifyWebHelper  
+         // anyway. But should the case ever occur that a connection can still not be
+         // established, this is the delay for how frequently connection attempts to 
+         // it are made. 
+         retryHelperConnection: 5000
+     }
+     ``` 
 
 #### helper.player
  - `<`[`PlayerEventEmitter`](#class-playereventemitter)`>`
@@ -76,6 +118,15 @@ helper.player.on('ready', () => {
 
 ### Class: PlayerEventEmitter ###
 Inherits from [EventEmitter](https://nodejs.org/dist/latest/docs/api/events.html#events_class_eventemitter).
+
+#### Event: 'open'
+Spotify client was started.
+
+#### Event: 'closing'
+User triggered shutdown of the Spotify client.
+
+#### Event: 'close'
+Spotify client shutdown is done.
 
 #### Event: 'end'
 Playback has ended.
